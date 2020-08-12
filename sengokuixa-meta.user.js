@@ -14787,7 +14787,6 @@ http://pocket-se.info/
 
 			//クエスト用メニュー（その他用）
 			createMenu($('#gnavi .gMenu06'), [
-				{ title: 'プレゼントボックス', action: '/user/present.php' },
 				{ title: '戦国くじ', action: '/senkuji/senkuji.php' },
 				//		{ title: 'スペシャル戦国くじ', action: '/senkuji/senkuji.php?ex=1' },
 				{ title: '戦国くじ履歴', action: '/senkuji/senkuji_history.php' },
@@ -15137,148 +15136,6 @@ http://pocket-se.info/
 		main: function () {
 			$('.common_table1 TH').first().width(80);
 		}
-
-	});
-
-	//■ /user/present
-	Page.registerAction('user', 'present', {
-
-		//. style
-		style: '' +
-			'#ig_deckheadmenubox { top: 0px; }' +
-			'#ig_deckheadmenubox IMG { top: 0px !important; }' +
-
-			'BUTTON.imc_receive { position: relative; top: -25px; left: 395px; }' +
-
-			'.common_box3 LABEL { position: relative; top: -6px; font-size: 14px; padding: 2px 4px; border-radius: 3px; }' +
-			'.common_box3:hover LABEL { background-color: #f9dea1; }' +
-			'',
-
-		//. main
-		main: function () {
-			//「すべてのプレゼントを受け取る」ボタンが有るかどうか
-			if ($('#ig_allbtn').length == 0) { return; }
-
-			var $button = $('<button class="imc_receive">選択したプレゼントを受け取る</button>');
-			$('.ig_decksection_top').append($button);
-			$button.click(this.receive);
-
-			$('#ig_boxInner')
-				.on('click', '.common_box3', function (event) {
-					var $a = $(event.target).closest('INPUT'),
-						$input = $(this).find('INPUT[type="checkbox"]'),
-						flag;
-
-					if ($a.length == 1) { return; }
-
-					flag = $input.attr('checked');
-					$input.attr('checked', !flag);
-				});
-
-			this.autoPager();
-			this.layouter($('#ig_boxInner .common_box3'));
-		},
-
-		//. autoPager
-		autoPager: function () {
-			var self = this;
-
-			$.autoPager({
-				next: 'UL.pager LI.last A:first',
-				container: '.ig_decksection_mid',
-				loaded: function (html) {
-					var $box = $(html).find('#ig_boxInner'),
-						$div = $box.find('.common_box3'),
-						$card = $box.children('[id^="cardWindow_"]');
-
-					self.layouter($div);
-
-					$('.ig_decksection_mid').append($div);
-					$('#ig_boxInner').append($card);
-					Metabox.replaceClass();
-				},
-				ended: function () {
-					Display.info('全ページ読み込み完了');
-				}
-			});
-		},
-
-		//. layouter
-		layouter: function ($div) {
-			$div.each(function () {
-				var $input = $(this).find('INPUT[name="id"]');
-				if ($input.length == 0) { return; }
-
-				var pid = $input.val(),
-					html = '';
-
-				html += '<label style="color: black; cursor: pointer;">';
-				html += '<input type="checkbox" value="' + pid + '" /> 受け取る</label>';
-
-				$input.after(html);
-			});
-		},
-
-		//. receive
-		receive: function () {
-			var pid_list = [],
-				result, ol;
-
-			$('.ig_decksection_mid').find('INPUT:checked').each(function () {
-				pid_list.push($(this).val());
-			});
-
-			if (pid_list.length == 0) {
-				Display.info('選択されていません。');
-				return false;
-			}
-
-			result = window.confirm('選択したプレゼントを受け取りますか？');
-			if (!result) { return false; }
-
-			//オーバーレイ表示
-			ol = Display.dialog();
-			ol.message('受け取り処理開始...');
-
-			$.Deferred().resolve()
-				.then(function () {
-					var pid = pid_list.shift();
-					if (!pid) { return; }
-
-					return $.post('/user/present.php', { id: pid })
-						.then(function (html) {
-							var match = html.match(/alert\([\x22\x27](.+)[\x22\x27]\)/);
-							if (match) {
-								ol.message(match[1].replace('\n', ''));
-							}
-							else {
-								return $.Deferred().reject();
-							}
-
-							return Util.wait(300);
-						})
-						.then(arguments.callee);
-				})
-				.done(function () {
-					ol.message('受け取り処理終了').message('ページを更新します...');
-				})
-				.fail(function () {
-					ol.message('受け取り処理失敗').message('処理を中断します。');
-				})
-				.always(function () {
-					Page.move('/user/present.php');
-				});
-
-			return false;
-		}
-
-	});
-
-	//■ /user/present_history
-	Page.registerAction('user', 'present_history', {
-
-		//. style
-		style: Page.getAction('user', 'present', 'style')
 
 	});
 
@@ -23571,7 +23428,6 @@ http://pocket-se.info/
 	Page.registerExtention(
 		'/user/ranking',
 		'/user/ranking_history',
-		'/user/present_history',
 		'/card/trade',
 		'/card/trade_card',
 		'/war/list',
