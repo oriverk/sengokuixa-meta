@@ -2693,170 +2693,6 @@ http://pocket-se.info/
 			$('#imi_info').hide();
 		},
 
-		// 秘境へ行く
-		goDungeon: function (select) {
-			var dungeon = {
-				1: '修験の山：渓谷(城:3h)',
-				2: '修験の山：樹海(城:6h)',
-				3: '絶壁の祠(銅:3h)',
-				4: '長寿の泉(銅:6h)',
-				100: '風の霊峰(兵:3h)',
-				200: '煉獄の島(兵:6h)',
-			};
-
-			if (window.confirm('部隊を再編成して\n' + dungeon[select] + 'に出発します。\nよろしいですか？')) {
-				// 部隊解散
-				Deck.breakUpAll()
-					.always(function (ol) {
-						Util.getUnitStatus();
-						if (ol && ol.close) {
-							window.setTimeout(ol.close, 500);
-						}
-
-						// コストの取得
-						$.get('/card/deck.php', { ano: 4 })
-							.then(function (responseText) {
-								var $html = $(responseText),
-									[dmy, use, max] = $html.find('.deckcost SPAN').text().match(/(\d+)\/(\d+)/),
-									newano = 5 - $html.find('#ig_unitchoice LI:contains("[---新規部隊を作成---]")').length;
-
-								return [max, use, newano];
-							})
-							// デッキ情報の初期化と武将一覧を取得
-							.then(function () {
-								var [max, use, newano] = arguments[0],
-									unit = new Unit();
-								Deck.setup(max, use, newano, unit);
-
-								return $.ajax('/card/deck.php', {
-									beforeSend: function (xhr) {
-										xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-									}
-								});
-							})
-							// 武将一覧の作成とソート条件の定義
-							.then(function (responseJSON) {
-								JsonCard.setup(responseJSON.card_data);
-
-								var data, conditions = [];
-
-								Deck.filter.conditions = [];
-								Deck.filter.exceptions = {}; // ブラックリスト
-
-								data = Deck.getConditionByTitle('討伐：降', Deck.sortList);
-								if (data) { conditions.push(data); }
-
-								data = Deck.getConditionByTitle('コスト：昇', Deck.sortList);
-								if (data) { conditions.push(data); }
-
-								data = Deck.getConditionByTitle('ランク：降', Deck.sortList);
-								if (data) { conditions.push(data); }
-
-								Deck.sort.conditions = conditions;
-
-								return [4];
-							})
-							// 新規部隊作成
-							.then(function (unitnum) {
-								var units = [],
-									cardlist = Deck.targetList(),
-									assignlist = [],
-									namelist = {},
-									freecost = Deck.freeCost - Deck.currentUnit.cost,
-									freecard = (5 - Deck.newano) * unitnum,
-									village = Util.getVillageCurrent();
-
-								if (freecost == 0 || freecard == 0) {
-									Display.alert('編成できませんでした。');
-									return $.Deferred().reject();
-								}
-
-								for (var i = 0, len = cardlist.length; i < len && freecard > 0; i++) {
-									let card = cardlist[i];
-									if (!card.canAssign()) { continue; }
-									if (card.cost > freecost) { continue; }
-									if (namelist[card.name]) { continue; }
-									if (card.cost == 0) { continue; }	// 童除外
-
-									namelist[card.name] = true;
-									freecost -= card.cost;
-									freecard--;
-									assignlist.push(card);
-								}
-
-								if (assignlist.length == 0) {
-									Display.alert('編成できませんでした。');
-									return $.Deferred().reject();
-								}
-
-								var count = Math.ceil(assignlist.length / unitnum);
-								for (var i = 0; i < count; i++) {
-									let unit = new Unit();
-									unit.village = village;
-									units.push(unit);
-								}
-
-								return [units, assignlist, unitnum];
-							})
-							.then(function (param) {
-								var self = arguments.callee,
-									village = Util.getVillageCurrent(),
-									[units, assignlist, unitnum] = param,
-									unit;
-
-								// 登録終了
-								if (assignlist.length == 0) {
-									// Util.getUnitStatusCD();
-									Display.dialog().message('秘境に出発します...');
-									// 秘境出発
-									$.get('/facility/dungeon.php')
-										.done(function (html) {
-											var postData = {
-												btn_send_all: true,
-												dungeon_select: select,
-												unit_select: [],
-											};
-											$(html).find('input[name^=unit_select]').each(function (idx, elm) {
-												postData.unit_select.push($(elm).val());
-											});
-											$.post('/facility/dungeon.php', postData).done(function () {
-												location.href = '/facility/unit_status.php?dmo=all';
-											});
-										});
-									return;
-								}
-
-								unit = units.shift();
-								for (var i = 0; (unit.list.length + unit.assignList.length) < unitnum && assignlist.length > 0; i++) {
-									unit.assignList.push(assignlist.shift());
-								}
-
-								unit.assignCard(Deck.newano)
-									.done(function () {
-										var cardlist = Deck.analyzedData,
-											assignlist = unit.assignList;
-
-										for (var i = 0, len = assignlist.length; i < len; i++) {
-											let card = assignlist[i];
-
-											card.element.remove();
-											card.element = null;
-											delete cardlist[card.cardId];
-										}
-
-										Deck.newano++;
-									})
-									.always(function (param2) {
-										var [ol] = param2;
-										if (ol && ol.close) { ol.close(); }
-										self(param);
-									});
-							});
-					});
-
-			}
-		},
-
 		// GitHubリポジトリから合成表を取得する
 		getSkillTable: function () {
 			// Cross-Origin Resource Sharingについてはこのあたりを参考
@@ -10237,15 +10073,6 @@ http://pocket-se.info/
 					'<legend>登録完了後</legend>' +
 					'<label><input name="imn_all_assign_option" type="radio" value="3" /> 部隊編成を続行</label><br/>';
 
-				if (option2) {
-					html += '<label><input name="imn_all_assign_option" type="radio" value="1" /> 秘境探索画面へ</label><br/>';
-					html += '<label><input name="imn_all_assign_option" type="radio" value="2" checked /> 目的地へ出陣</label><br/>';
-				}
-				else {
-					html += '<label><input name="imn_all_assign_option" type="radio" value="1" checked /> 秘境探索画面へ</label><br/>';
-					html += '<label style="color: #999;"><input name="imn_all_assign_option" type="radio" value="2" disabled /> 目的地へ出陣</label><br/>';
-				}
-
 				html += '' +
 					'<label><input name="imn_all_assign_option" type="radio" value="0" /> 部隊編成ダイアログを閉じる</label><br/>' +
 					'</fieldset>';
@@ -13960,10 +13787,7 @@ http://pocket-se.info/
 				var href = '/land.php?x=' + village.x + '&y=' + village.y + '&c=' + village.country;
 				menu['内政実行'] = function () { location.href = Util.getVillageChangeUrl(village.id, href); };
 			}
-			if (village.type == '本領' || village.type == '所領') {
-				menu['秘境探索'] = function () { location.href = Util.getVillageChangeUrl(village.id, '/facility/dungeon.php'); };
-			}
-
+		
 			menu['セパレーター１'] = $.contextMenu.separator;
 
 			if (location.pathname != '/card/deck.php') {
@@ -14743,16 +14567,6 @@ http://pocket-se.info/
 					}
 				},
 				{ title: '【一括レベルアップ】', action: function () { Append.togetherLevelup(); } },
-			]);
-
-			//秘境用メニュー
-			createMenu($('#gnavi .gMenu04'), [
-				{ title: '修験渓谷(城:3h)', action: function () { Append.goDungeon(1); } },
-				{ title: '修験樹海(城:6h)', action: function () { Append.goDungeon(2); } },
-				{ title: '絶壁の祠(銅:3h)', action: function () { Append.goDungeon(3); } },
-				{ title: '長寿の泉(銅:6h)', action: function () { Append.goDungeon(4); } },
-				{ title: '風の霊峰(兵:3h)', action: function () { Append.goDungeon(100); } },
-				{ title: '煉獄の島(兵:6h)', action: function () { Append.goDungeon(200); } },
 			]);
 
 			//合戦用メニュー
